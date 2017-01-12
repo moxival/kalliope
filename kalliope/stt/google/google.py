@@ -21,7 +21,7 @@ class Google(SpeechRecognition):
         self.show_all = kwargs.get('show_all', False)
 
         # start listening in the background
-        self.stop_listening = self.start_listening(self.google_callback)
+        self.start_listening(self.google_callback)
 
     def google_callback(self, recognizer, audio):
         """

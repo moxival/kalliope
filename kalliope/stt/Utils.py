@@ -15,7 +15,7 @@ class SpeechRecognition(object):
 
     def start_listening(self, callback):
         Utils.print_info("Say something!")
-        self.recognizer.listen_in_background(self.microphone, callback=callback)
+        self.stop_listening = self.recognizer.listen_in_background(self.microphone, callback=callback)
 
     def interrupt(self):
         self.stop_listening()

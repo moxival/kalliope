@@ -38,6 +38,7 @@ class MainController:
         # create an order listener object. This last will the trigger callback before starting
         self.order_listener = OrderListener(self.analyse_order)
 
+        # here we tell the user that we are listening
         if self.settings.random_on_ready_answers is not None:
             Say(message=self.settings.random_on_ready_answers)
         elif self.settings.random_on_ready_sounds is not None:
@@ -48,6 +49,14 @@ class MainController:
         self.trigger_instance = self._get_default_trigger()
         self.trigger_instance.start()
         Utils.print_info("Waiting for trigger detection")
+
+    # def run(self):
+    #     # start trigger
+    #     while True:
+    #         if no_more_listener:
+    #             create_new_listenner
+    #             lisstener.start
+
 
     def callback(self):
         """
@@ -71,6 +80,7 @@ class MainController:
         :param order: the sentence received
         :type order: str
         """
+        self.order_listener.stt_instance.stop_listening()
         if order is not None:   # maybe we have received a null audio from STT engine
             order_analyser = OrderAnalyser(order, brain=self.brain)
             order_analyser.start()
