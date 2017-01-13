@@ -26,37 +26,52 @@ class MainController:
         sl = SettingLoader()
         self.settings = sl.settings
 
+
+
+        # Starting the rest API
+        self._start_rest_api()
+
+        # Ready answer
+        self._ready_answers()
+
+        # create an order listener object. This last will the trigger callback before starting
+        # self.order_listener = OrderListener(self.analyse_order)
+
+
+
+        # Get trigger
+        self.trigger_instance = self._get_default_trigger()
+        # Wait that the kalliope trigger is pronounced by the user
+        self.trigger_instance.start()
+        Utils.print_info("Waiting for trigger detection")
+
+    def _start_main_process(self):
+
+        while True:
+            self.order_listener = OrderListener(self.analyse_order)
+            self.order_listener.join()
+
+
+
+    def _start_rest_api(self):
         # run the api if the user want it
         if self.settings.rest_api.active:
             Utils.print_info("Starting REST API Listening port: %s" % self.settings.rest_api.port)
             app = Flask(__name__)
-            flask_api = FlaskAPI(app, port=self.settings.rest_api.port, brain=self.brain,
+            flask_api = FlaskAPI(app=app,
+                                 port=self.settings.rest_api.port,
+                                 brain=self.brain,
                                  allowed_cors_origin=self.settings.rest_api.allowed_cors_origin)
             flask_api.daemon = True
             flask_api.start()
 
-        # create an order listener object. This last will the trigger callback before starting
-        self.order_listener = OrderListener(self.analyse_order)
-
+    def _ready_answers(self):
         # here we tell the user that we are listening
         if self.settings.random_on_ready_answers is not None:
             Say(message=self.settings.random_on_ready_answers)
         elif self.settings.random_on_ready_sounds is not None:
             random_sound_to_play = self._get_random_sound(self.settings.random_on_ready_sounds)
             Mplayer.play(random_sound_to_play)
-
-        # Wait that the kalliope trigger is pronounced by the user
-        self.trigger_instance = self._get_default_trigger()
-        self.trigger_instance.start()
-        Utils.print_info("Waiting for trigger detection")
-
-    # def run(self):
-    #     # start trigger
-    #     while True:
-    #         if no_more_listener:
-    #             create_new_listenner
-    #             lisstener.start
-
 
     def callback(self):
         """
@@ -89,7 +104,7 @@ class MainController:
         Utils.print_info("Waiting for trigger detection")
         self.trigger_instance.unpause()
         # create a new order listener that will wait for start
-        self.order_listener = OrderListener(self.analyse_order)
+        # self.order_listener = OrderListener(self.analyse_order)
 
     def _get_default_trigger(self):
         """
