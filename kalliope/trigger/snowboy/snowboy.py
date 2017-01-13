@@ -6,6 +6,7 @@ from threading import Thread
 
 from kalliope import Utils
 from kalliope.trigger.snowboy import snowboydecoder
+from cffi import FFI as _FFI
 
 
 class SnowboyModelNotFounfd(Exception):
@@ -23,6 +24,7 @@ class Snowboy(Thread):
 
     def __init__(self, **kwargs):
         super(Snowboy, self).__init__()
+        self._ignore_stderr()
         # pause listening boolean
         self.interrupted = False
         self.kill_received = False
@@ -85,3 +87,25 @@ class Snowboy(Thread):
         logger.debug("Unpausing snowboy process")
         self.detector.paused = False
 
+    @staticmethod
+    def _ignore_stderr():
+        """
+        Try to forward PortAudio messages from stderr to /dev/null.
+        """
+        ffi = _FFI()
+        ffi.cdef("""
+            /* from stdio.h */
+            FILE* fopen(const char* path, const char* mode);
+            int fclose(FILE* fp);
+            FILE* stderr;  /* GNU C library */
+            FILE* __stderrp;  /* Mac OS X */
+            """)
+        stdio = ffi.dlopen(None)
+        devnull = stdio.fopen(os.devnull.encode(), b'w')
+        try:
+            stdio.stderr = devnull
+        except KeyError:
+            try:
+                stdio.__stderrp = devnull
+            except KeyError:
+                stdio.fclose(devnull)
