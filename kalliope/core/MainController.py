@@ -17,34 +17,19 @@ logging.basicConfig()
 logger = logging.getLogger("kalliope")
 
 
-class StateMachine(object):
-
-    states = ['init', 'trigger_started', 'ready_sound_played', 'wake_up_answer',
-              'order_listener_started', 'order_analyser']
-
-    def __init__(self, brain=None):
-        self.brain = brain
-
-        self.main_controller = MainController(brain=brain)
-        # Initialize the state machine
-        self.machine = Machine(model=self.main_controller, states=StateMachine.states, initial='init')
-
-        # define transitions
-        self.machine.add_transition('start_trigger', 'init', 'trigger_started')
-        self.machine.add_transition('play_ready_sound', 'trigger_init', 'ready_sound_played')
-        self.machine.add_transition('start_order_listener', 'ready_sound_played', 'order_listener_started')
-        self.machine.add_transition('play_wake_up_answer', 'order_listener_started', 'wake_up_answer')
-
-        # add callbacks
-        self.machine.on_enter_trigger_started('start_trigger_thread')
-
-        self.main_controller.start_trigger()
-
-
 class MainController:
     """
     This Class is the global controller of the application.
     """
+    states = ['init',
+              'starting_trigger',
+              'unpausing_trigger',
+              'playing_ready_sound',
+              'waiting_for_trigger_callback',
+              'start_order_listener',
+              'playing_wake_up_answer',
+              'waiting_for_order_listener_callback',
+              'analysing_order']
 
     def __init__(self, brain=None):
         self.brain = brain
@@ -52,57 +37,102 @@ class MainController:
         sl = SettingLoader()
         self.settings = sl.settings
 
+        # Starting the rest API
+        self._start_rest_api()
+
         # save an instance of the trigger
         self.trigger_instance = None
 
         # save the current order listener
         self.order_listener = None
 
-        # Starting the rest API
-        self._start_rest_api()
+        # Initialize the state machine
+        self.machine = Machine(model=self, states=MainController.states, initial='init')
 
-    def start_trigger_thread(self):
-        print "here"
+        # define transitions
+        self.machine.add_transition('start_trigger', 'init', 'starting_trigger')
+        self.machine.add_transition('unpause_trigger', ['starting_trigger', 'analysing_order'], 'unpausing_trigger')
+        self.machine.add_transition('play_ready_sound', 'unpausing_trigger', 'playing_ready_sound')
+        self.machine.add_transition('wait_trigger_callback', 'playing_ready_sound', 'waiting_for_trigger_callback')
+        self.machine.add_transition('play_wake_up_answer', 'waiting_for_trigger_callback', 'playing_wake_up_answer')
+        self.machine.add_transition('wait_for_order', 'playing_wake_up_answer', 'waiting_for_order_listener_callback')
+        self.machine.add_transition('analyse_order', 'waiting_for_order_listener_callback', 'analysing_order')
+
+        self.machine.add_ordered_transitions()
+
+        # add callbacks
+        self.machine.on_enter_starting_trigger('start_trigger_process')
+        self.machine.on_enter_playing_ready_sound('play_ready_sound_process')
+        self.machine.on_enter_waiting_for_trigger_callback('waiting_for_trigger_callback_thread')
+        self.machine.on_enter_playing_wake_up_answer('play_wake_up_answer_thread')
+        self.machine.on_enter_start_order_listener('start_order_listener_thread')
+        self.machine.on_enter_waiting_for_order_listener_callback('waiting_for_order_listener_callback_thread')
+        self.machine.on_enter_analysing_order('analysing_order_thread')
+        self.machine.on_enter_unpausing_trigger('unpausing_trigger_process')
+
+        self.start_trigger()
+
+    def start_trigger_process(self):
+        print "Entering state: %s" % self.state
         self.trigger_instance = self._get_default_trigger()
+        # self.trigger_instance.daemon = True
         # Wait that the kalliope trigger is pronounced by the user
         self.trigger_instance.start()
-        print "here"
         Utils.print_info("Waiting for trigger detection")
-        # self.machine.play_ready_sound()
+        self.next_state()
 
-    def play_ready_sound(self):
+    def unpausing_trigger_process(self):
+        print "Entering state: %s" % self.state
+        self.trigger_instance.unpause()
+        self.next_state()
+
+    def play_ready_sound_process(self):
         """
         Play a sound when Kalliope is ready to be awaken
         """
+        print "Entering state: %s" % self.state
         # here we tell the user that we are listening
         if self.settings.random_on_ready_answers is not None:
             Say(message=self.settings.random_on_ready_answers)
         elif self.settings.random_on_ready_sounds is not None:
             random_sound_to_play = self._get_random_sound(self.settings.random_on_ready_sounds)
             Mplayer.play(random_sound_to_play)
+        self.next_state()
+
+    def waiting_for_trigger_callback_thread(self):
+        print "Entering state: %s" % self.state
+
+    def waiting_for_order_listener_callback_thread(self):
+        print "Entering state: %s" % self.state
 
     def trigger_callback(self):
         """
         we have detected the hotword, we can now pause the Trigger for a while
         The user can speak out loud his order during this time.
         """
-        self.machine.start_order_listener()
+        print "Trigger callback called"
+        self.next_state()
 
-    def start_order_listener(self):
+    def start_order_listener_thread(self):
+        print "Entering state: %s" % self.state
         # pause the trigger process
         self.trigger_instance.pause()
         # start listening for an order
         self.order_listener = OrderListener(callback=self.order_listener_callback)
         self.order_listener.start()
-        self.machine.play_wake_up_answer()
 
-    def play_wake_up_answer(self):
+        self.next_state()
+
+    def play_wake_up_answer_thread(self):
+        print "Entering state: %s" % self.state
         # if random wake answer sentence are present, we play this
         if self.settings.random_wake_up_answers is not None:
             Say(message=self.settings.random_wake_up_answers)
         else:
             random_sound_to_play = self._get_random_sound(self.settings.random_wake_up_sounds)
             Mplayer.play(random_sound_to_play)
+
+        self.next_state()
 
     def order_listener_callback(self, order):
         """
@@ -111,16 +141,20 @@ class MainController:
         :type order: str
         """
         print "order to process: %s" % order
-        # self.order_listener.stt_instance.stop_listening()
-        # if order is not None:   # maybe we have received a null audio from STT engine
-        #     order_analyser = OrderAnalyser(order, brain=self.brain)
-        #     order_analyser.start()
-        #
+        self.next_state(order)
+
+    def analysing_order_thread(self, order):
+        print "order in analysing_order_thread %s" % order
+        if order is not None:   # maybe we have received a null audio from STT engine
+            order_analyser = OrderAnalyser(order, brain=self.brain)
+            order_analyser.start()
+
+        self.unpause_trigger()
         # # restart the trigger when the order analyser has finish his job
         # Utils.print_info("Waiting for trigger detection")
         # self.trigger_instance.unpause()
-        # # create a new order listener that will wait for start
-        # # self.order_listener = OrderListener(self.analyse_order)
+        # create a new order listener that will wait for start
+        # self.order_listener = OrderListener(self.analyse_order)
 
     def _get_default_trigger(self):
         """

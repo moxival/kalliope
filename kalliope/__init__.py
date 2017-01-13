@@ -7,7 +7,7 @@ from kalliope.core import ShellGui
 from kalliope.core import Utils
 from kalliope.core.ConfigurationManager.BrainLoader import BrainLoader
 from kalliope.core.EventManager import EventManager
-from kalliope.core.MainController import MainController, StateMachine
+from kalliope.core.MainController import MainController
 
 from _version import version_str
 import signal
@@ -89,7 +89,7 @@ def main():
             # catch signal for killing on Ctrl+C pressed
             signal.signal(signal.SIGINT, signal_handler)
             # start the state machine
-            StateMachine(brain=brain)
+            MainController(brain=brain)
 
     if args.action == "gui":
         ShellGui(brain=brain)
