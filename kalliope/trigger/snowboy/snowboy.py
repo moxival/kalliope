@@ -2,8 +2,9 @@ import inspect
 import logging
 import os
 import time
+from threading import Thread
 
-from kalliope.core.TriggerModule import TriggerModule
+from kalliope import Utils
 from kalliope.trigger.snowboy import snowboydecoder
 
 
@@ -18,7 +19,7 @@ logging.basicConfig()
 logger = logging.getLogger("kalliope")
 
 
-class Snowboy(TriggerModule):
+class Snowboy(Thread):
 
     def __init__(self, **kwargs):
         super(Snowboy, self).__init__()
@@ -36,7 +37,7 @@ class Snowboy(TriggerModule):
         if self.pmdl is None:
             raise MissingParameterException("Pmdl file is required with snowboy")
 
-        self.pmdl_path = self.get_file_from_path(self.pmdl)
+        self.pmdl_path = Utils.get_real_file_path(self.pmdl)
         if not os.path.isfile(self.pmdl_path):
             raise SnowboyModelNotFounfd("The snowboy model file %s does not exist" % self.pmdl_path)
 
@@ -51,7 +52,7 @@ class Snowboy(TriggerModule):
         """
         return self.interrupted
 
-    def start(self):
+    def run(self):
         """
         Start the snowboy thread and wait for a Kalliope trigger word
         :return:
