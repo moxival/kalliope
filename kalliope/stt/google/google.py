@@ -24,7 +24,7 @@ class Google(SpeechRecognition):
 
         # start listening in the background
         self.set_callback(self.google_callback)
-        self.start()
+        self.start_listening()
 
     def google_callback(self, recognizer, audio):
         """

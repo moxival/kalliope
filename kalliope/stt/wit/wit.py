@@ -20,7 +20,8 @@ class Wit(SpeechRecognition):
         self.show_all = kwargs.get('show_all', False)
 
         # start listening in the background
-        self.stop_listening = self.start_listening(self.wit_callback)
+        self.set_callback(self.wit_callback)
+        self.start_listening()
 
     def wit_callback(self, recognizer, audio):
         try:

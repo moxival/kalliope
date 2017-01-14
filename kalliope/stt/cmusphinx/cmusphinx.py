@@ -18,7 +18,8 @@ class Cmusphinx(SpeechRecognition):
         self.callback = callback
 
         # start listening in the background
-        self.stop_listening = self.start_listening(self.sphinx_callback)
+        self.set_callback(self.sphinx_callback)
+        self.start_listening()
 
     def sphinx_callback(self, recognizer, audio):
         """

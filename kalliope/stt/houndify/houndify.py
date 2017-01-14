@@ -23,7 +23,8 @@ class Houndify(SpeechRecognition):
         self.show_all = kwargs.get('show_all', False)
 
         # start listening in the background
-        self.stop_listening = self.start_listening(self.houndify_callback)
+        self.set_callback(self.houndify_callback)
+        self.start_listening()
 
     def houndify_callback(self, recognizer, audio):
         """

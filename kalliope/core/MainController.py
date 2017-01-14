@@ -60,7 +60,7 @@ class MainController:
 
         self.machine.add_ordered_transitions()
 
-        # add callbacks
+        # add method which are called when changing state
         self.machine.on_enter_starting_trigger('start_trigger_process')
         self.machine.on_enter_playing_ready_sound('play_ready_sound_process')
         self.machine.on_enter_waiting_for_trigger_callback('waiting_for_trigger_callback_thread')
@@ -73,24 +73,31 @@ class MainController:
         self.start_trigger()
 
     def start_trigger_process(self):
-        print "Entering state: %s" % self.state
+        """
+        This function will start the trigger thread that listen for the hotword
+        """
+        logger.debug("Entering state: %s" % self.state)
         self.trigger_instance = self._get_default_trigger()
         # self.trigger_instance.daemon = True
         # Wait that the kalliope trigger is pronounced by the user
         self.trigger_instance.start()
-        Utils.print_info("Waiting for trigger detection")
         self.next_state()
 
     def unpausing_trigger_process(self):
-        print "Entering state: %s" % self.state
+        """
+        If the trigger was in pause, this method will unpause it to listen again for the hotword
+        """
+        logger.debug("Entering state: %s" % self.state)
         self.trigger_instance.unpause()
+        Utils.print_info("Waiting for trigger detection")
         self.next_state()
 
     def play_ready_sound_process(self):
         """
-        Play a sound when Kalliope is ready to be awaken
+        Play a sound when Kalliope is ready to be awaken at the first start
         """
-        print "Entering state: %s" % self.state
+        # TODO place a settings to play the sound every time kalliope is waiting for a wake up
+        logger.debug("Entering state: %s" % self.state)
         # here we tell the user that we are listening
         if self.settings.random_on_ready_answers is not None:
             Say(message=self.settings.random_on_ready_answers)
@@ -100,31 +107,43 @@ class MainController:
         self.next_state()
 
     def waiting_for_trigger_callback_thread(self):
-        print "Entering state: %s" % self.state
+        """
+        Method to print in debug that the main process is waiting for a trigger detection
+        """
+        logger.debug("Entering state: %s" % self.state)
 
     def waiting_for_order_listener_callback_thread(self):
-        print "Entering state: %s" % self.state
+        """
+        Method to print in debug that the main process is waiting for an order to analyse
+        """
+        logger.debug("Entering state: %s" % self.state)
 
     def trigger_callback(self):
         """
         we have detected the hotword, we can now pause the Trigger for a while
         The user can speak out loud his order during this time.
         """
-        print "Trigger callback called"
+        logger.debug("Trigger callback called, switching to the next state")
         self.next_state()
 
     def start_order_listener_thread(self):
-        print "Entering state: %s" % self.state
+        """
+        Start the STT engine thread
+        """
+        logger.debug("Entering state: %s" % self.state)
         # pause the trigger process
         self.trigger_instance.pause()
         # start listening for an order
         self.order_listener = OrderListener(callback=self.order_listener_callback)
         self.order_listener.start()
-
         self.next_state()
 
     def play_wake_up_answer_thread(self):
-        print "Entering state: %s" % self.state
+        """
+        Play a sound or make Kalliope say something to notify the user that she has been awaken and now
+        waiting for order
+        """
+        logger.debug("Entering state: %s" % self.state)
         # if random wake answer sentence are present, we play this
         if self.settings.random_wake_up_answers is not None:
             Say(message=self.settings.random_wake_up_answers)
@@ -140,21 +159,20 @@ class MainController:
         :param order: the sentence received
         :type order: str
         """
-        print "order to process: %s" % order
+        logger.debug("order listener callback called. Order to process: %s" % order)
         self.next_state(order)
 
     def analysing_order_thread(self, order):
-        print "order in analysing_order_thread %s" % order
+        """
+        Start the order analyser with the caught order to process
+        :param order: the text order to analyse
+        """
+        logger.debug("order in analysing_order_thread %s" % order)
         if order is not None:   # maybe we have received a null audio from STT engine
             order_analyser = OrderAnalyser(order, brain=self.brain)
             order_analyser.start()
-
+        # return to the state "unpausing_trigger"
         self.unpause_trigger()
-        # # restart the trigger when the order analyser has finish his job
-        # Utils.print_info("Waiting for trigger detection")
-        # self.trigger_instance.unpause()
-        # create a new order listener that will wait for start
-        # self.order_listener = OrderListener(self.analyse_order)
 
     def _get_default_trigger(self):
         """
@@ -180,6 +198,9 @@ class MainController:
         return Utils.get_real_file_path(random_path)
 
     def _start_rest_api(self):
+        """
+        Start the Rest API if asked in the user settings
+        """
         # run the api if the user want it
         if self.settings.rest_api.active:
             Utils.print_info("Starting REST API Listening port: %s" % self.settings.rest_api.port)

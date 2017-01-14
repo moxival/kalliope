@@ -19,8 +19,10 @@ class Bing(SpeechRecognition):
         self.key = kwargs.get('key', None)
         self.language = kwargs.get('language', "en-US")
         self.show_all = kwargs.get('show_all', False)
+
         # start listening in the background
-        self.stop_listening = self.start_listening(self.bing_callback)
+        self.set_callback(self.bing_callback)
+        self.start_listening()
 
     def bing_callback(self, recognizer, audio):
         """
